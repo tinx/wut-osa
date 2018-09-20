@@ -1,0 +1,45 @@
+- name: Set up DNS resolving
+  hosts: all
+  become: true
+  tasks:
+    - lineinfile:
+        path: /etc/resolv.conf
+        regexp: '^nameserver '
+        line: 'nameserver 8.8.8.8'
+
+- name: Set up loadbalancer
+  hosts: lb*
+  become: true
+  tasks:
+    - include_role:
+        name: ansible-role-haproxy
+      vars:
+        haproxy_frontend_name: 'hafrontend'
+        haproxy_frontend_bind_address: '*'
+        haproxy_frontend_port: 80
+        haproxy_frontend_mode: 'http'
+        haproxy_backend_servers:
+          - name: frontend1
+            address: 'frontend1:80'
+
+- name: Set up frontend node
+  hosts: frontend*
+  become: true
+  tasks:
+    - include_role:
+        name: strato_core.apache2
+    - include_role:
+        name: strato_core.wp_mariadb
+    - include_role:
+        name: strato_core.wordpress
+      vars:
+        wp_dns_name: 85.215.64.33
+        wp_db_server: localhost
+        wp_db_name: wp
+        wp_db_username: wp
+        wp_db_password: ZoopaZeekrit!
+        wp_title: Blogosphere-Thingy!
+        wp_admin_user: jim
+        wp_admin_password: MoarZeekrit!
+        wp_admin_email: jim@example.com
+

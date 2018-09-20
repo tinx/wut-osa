@@ -1,0 +1,41 @@
+---
+# tasks file for strato_core.wordpress
+- name: Download wp-cli
+  get_url:
+    url: https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+    dest: /root/wp-cli.phar
+    mode: 0755
+- name: Copy wp-cli to /usr/local/bin
+  copy:
+    src: /root/wp-cli.phar
+    remote_src: true
+    dest: /usr/local/sbin/wp
+    owner: root
+    group: root
+    mode: 0755
+- name: Install WordPress
+  command: /usr/local/sbin/wp core download
+  args:
+    chdir: /var/www/html/
+    creates: /var/www/html/wp-settings.php
+- name: Create database user
+  command: mysql --execute="CREATE USER '{{wp_db_username}}'@'localhost' IDENTIFIED BY '{{wp_db_password}}';" mysql
+  failed_when: false
+- name: Set database user permissions
+  command: mysql --execute="GRANT ALL PRIVILEGES ON * . * TO '{{wp_db_username}}'@'localhost';" mysql
+- name: Flush privileges
+  command: mysql --execute="FLUSH PRIVILEGES;" mysql
+- name: Create Wordpress Config
+  command: /usr/local/sbin/wp config create --dbname={{wp_db_name}} --dbuser={{wp_db_username}} --dbhost={{wp_db_server}} --dbpass={{wp_db_password}}
+  args:
+    chdir: /var/www/html/
+    creates: /var/www/html/wp-config.php
+- name: Create Wordpress Database
+  command: /usr/local/sbin/wp db create
+  args:
+    chdir: /var/www/html/
+  failed_when: false
+- name: Install Wordpress
+  command: /usr/local/sbin/wp core install --url={{wp_dns_name}} --title={{wp_title}} --admin_user={{wp_admin_user}} --admin_password={{wp_admin_password}} --admin_email={{wp_admin_email}}
+  args:
+    chdir: /var/www/html/

@@ -1,0 +1,182 @@
+---
+- name: Create a multi-tier infrastructure
+  hosts: localhost
+  connection: local
+  tasks:
+    # Storage
+    #
+    - name: Create extra storage volume for backend
+      os_volume:
+        cloud: wissenundteilen
+        availability_zone: orange
+        display_name: wut_extra_1
+        size: 100
+        state: present
+
+    # Networks
+    #
+    - name: Create front network
+      os_network:
+        cloud: wissenundteilen
+        external: false
+        name: wut_front_network
+        state: present
+    - name: Create front subnet
+      os_subnet:
+        cloud: wissenundteilen
+        name: wut_front_subnet
+        network_name: wut_front_network
+        cidr: 10.10.0.0/24
+        allocation_pool_start: 10.10.0.20
+        allocation_pool_end: 10.10.0.254
+        gateway_ip: 10.10.0.10
+
+    - name: Create back network
+      os_network:
+        cloud: wissenundteilen
+        external: false
+        name: wut_back_network
+        state: present
+    - name: Create back subnet
+      os_subnet:
+        cloud: wissenundteilen
+        name: wut_back_subnet
+        network_name: wut_back_network
+        cidr: 10.20.0.0/24
+        allocation_pool_start: 10.20.0.20
+        allocation_pool_end: 10.20.0.254
+        no_gateway_ip: true
+
+    # Routers
+    #
+    - name: Create front router
+      os_router:
+        cloud: wissenundteilen
+        name: wut_router
+        network: public0
+        interfaces:
+          - net: wut_front_network
+            subnet: wut_front_subnet
+            portip: 10.10.0.10
+
+    # Security Groups
+    #
+    - name: Create security group 'allow_ssh'
+      os_security_group:
+        cloud: wissenundteilen
+        name: allow_ssh
+        state: present
+    - name: Create security group rule for 'allow_ssh'
+      os_security_group_rule:
+        cloud: wissenundteilen
+        security_group: allow_ssh
+        protocol: tcp
+        port_range_min: 22
+        port_range_max: 22
+        remote_ip_prefix: 0.0.0.0/0
+
+    - name: Create security group 'frontends'
+      os_security_group:
+        cloud: wissenundteilen
+        name: frontends
+        state: present
+    - name: Create security group rule for 'allow_http'
+      os_security_group_rule:
+        cloud: wissenundteilen
+        security_group: frontends
+        protocol: tcp
+        port_range_min: 80
+        port_range_max: 80
+        remote_ip_prefix: 0.0.0.0/0
+
+    - name: Create security group 'allow_postgres_from_frontends'
+      os_security_group:
+        cloud: wissenundteilen
+        name: allow_postgres_from_frontends
+        state: present
+    - name: Create security group rule for 'allow_postgres_from_frontends'
+      os_security_group_rule:
+        cloud: wissenundteilen
+        security_group: allow_postgres_from_frontends
+        protocol: tcp
+        port_range_min: 5432
+        port_range_max: 5432
+        remote_group: frontends
+
+    # Servers
+    #
+    - name: Create CentOS loadbalancer server
+      os_server:
+        cloud: wissenundteilen
+        availability_zone: orange
+        name: lb1
+        key_name: wut_key
+        flavor: m1.small
+        image: "CentOS 7 GenericCloud"
+        auto_ip: false
+        security_groups:
+          - default
+          - allow_ssh
+          - frontends
+        nics:
+          - net-name=wut_front_network
+
+    - name: Create CentOS frontend server
+      os_server:
+        cloud: wissenundteilen
+        availability_zone: orange
+        name: frontend1
+        key_name: wut_key
+        flavor: m1.small
+        image: "CentOS 7 GenericCloud"
+        auto_ip: false
+        security_groups:
+          - default
+          - allow_ssh
+          - frontends
+        nics:
+          - net-name=wut_front_network
+          - net-name=wut_back_network
+
+    - name: Create CentOS backend server
+      os_server:
+        cloud: wissenundteilen
+        availability_zone: orange
+        name: backend1
+        key_name: wut_key
+        flavor: m1.small
+        image: "CentOS 7 GenericCloud"
+        auto_ip: false
+        security_groups:
+          - default
+          - allow_ssh
+          - allow_postgres_from_frontends
+        nics:
+          - net-name=wut_back_network
+        volumes:
+          - wut_extra_1
+
+    # Floating IPs
+    #
+    - name: Attach floating IP to loadbalancer
+      os_floating_ip:
+        cloud: wissenundteilen
+        server: lb1
+        network: public0
+        nat_destination: wut_front_network
+      register: floatingip
+    - name: show floating IP
+      debug:
+        var: floatingip
+
+    - name: Attach floating IP to frontend
+      os_floating_ip:
+        cloud: wissenundteilen
+        server: frontend1
+        network: public0
+        nat_destination: wut_front_network
+      register: floatingip
+    - name: show floating IP
+      debug:
+        var: floatingip
+

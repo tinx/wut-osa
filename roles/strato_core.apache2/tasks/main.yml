@@ -1,0 +1,11 @@
+---
+# tasks file for strato_core.apache2
+- name: Install Apache2 packages
+  yum:
+    name: '{{ item }}'
+    state: present
+  notify: restart apache
+  with_items:
+    - httpd
+    - php
+    - php-mysql

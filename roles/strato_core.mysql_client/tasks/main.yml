@@ -1,0 +1,7 @@
+---
+# tasks file for strato_core.mysql_client
+- name: Install mysql client packages
+  yum:
+    name: mariadb
+    state: present
+

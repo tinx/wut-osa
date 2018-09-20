@@ -1,0 +1,7 @@
+---
+# handlers file for strato_core.wp_mariadb
+- name: restart mariadb
+  service:
+    name: mariadb
+    state: restarted
+

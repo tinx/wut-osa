@@ -1,0 +1,13 @@
+---
+# tasks file for strato_core.wp_mariadb
+- name: Install mariadb client packages
+  yum:
+    name: mariadb
+    state: present
+- name: Install mariadb server packages
+  yum:
+    name: mariadb-server
+    state: present
+  notify: restart mariadb
+- name: Flush handlers
+  meta: flush_handlers
